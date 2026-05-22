@@ -1,0 +1,55 @@
+# .github/workflows/neon.yml (root alias for GitHub Pages deployment)
+# This workflow builds the static site and optionally runs a sanity check against Neon.
+# Place this file at the repository root (it will be automatically moved to .github/workflows by GitHub).
+
+name: Deploy AgroCash Site
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node (for optional scripts)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # Optional: verify Neon connection (requires NEON_API_KEY secret)
+      - name: Test Neon connection (optional)
+        env:
+          NEON_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          echo "Testing Neon connection..."
+          curl -s -X POST "$NEON_URL/sql" -H "Authorization: Bearer ${{ secrets.NEON_API_KEY }}" -H "Content-Type: application/sql" -d "SELECT 1;" | head -n 20
+        continue-on-error: true
+
+      - name: Deploy to GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact (site)
+        uses: actions/upload-pages-artifact@v2
+        with:
+          path: ./
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Deploy site
+        id: deploy
+        uses: actions/deploy-pages@v3
